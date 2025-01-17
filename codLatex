@@ -1,0 +1,117 @@
+\documentclass[a4paper,11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[romanian]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{float}
+
+\title{
+  \textbf{Maximizarea profitului turistic prin ierarhizarea categoriilor de activități}
+}
+
+\author{\textbf{Ioana Astefanoae}}
+\date{17 ianuarie 2025}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introducere}
+
+Scopul acestei lucrări este să prezinte o metodă clară de \textbf{maximizare a veniturilor} (\texttt{Revenue}) în domeniul turismului, bazată pe analiza unui \emph{set de date} de la adresa:
+\begin{center}
+\url{https://www.kaggle.com/datasets/umeradnaan/tourism-dataset}
+\end{center}
+
+Setul de date conține, pentru mai multe țări și intervale de timp, \textbf{informații despre}:
+\begin{itemize}
+  \item \textbf{Country} -- țara (există 7 țări distincte în total);
+  \item \textbf{Year} -- anul (ex. 2010--2019 sau alt interval);
+  \item \textbf{Category} -- tipul de activitate turistică (Nature, Historical, Cultural, Beach, Adventure, Urban);
+  \item \textbf{Visitors} -- numărul de turiști care au participat la activitatea respectivă;
+  \item \textbf{Revenue} -- venitul total (brut) obținut.
+\end{itemize}
+
+\noindent
+În context, ne dorim să \textbf{descoperim} care dintre categoriile turistice are potențialul de a genera cel mai mare profit într-o țară \emph{fixată la momentul deciziei}. Rezolvarea implică \textbf{predicția valorii \texttt{Revenue}} și \textbf{rangarea (sortarea descrescătoare)} a categoriilor. Pentru a îndeplini acest obiectiv, vom folosi un \textbf{model de tip Random Forest} (regresie).
+
+\section{Analiza setului de date și pași de preprocesare}
+
+\subsection{Curățarea și pregătirea datelor}
+
+\noindent
+Pentru a asigura \textbf{coerența} și \textbf{calitatea} modelelor de Învățare Automată, am aplicat următorii pași:
+
+\begin{enumerate}
+  \item \textbf{Eliminarea valorilor lipsă} (\texttt{NaN}): dacă unele rânduri au valori necunoscute la \texttt{Visitors} sau \texttt{Revenue}, le excludem, asumând că aceste cazuri sunt puține și nu afectează major setul.
+  \item \textbf{Codificarea variabilelor categorice}:
+  \begin{itemize}
+    \item \texttt{Country} se transformă în coduri de tip \emph{One-Hot}, pentru fiecare țară (de ex. \texttt{Country\_India}, \texttt{Country\_Brazil} etc.).
+    \item \texttt{Category} se transformă la rândul ei în coduri \texttt{Category\_Nature}, \texttt{Category\_Beach} ș.a.m.d. 
+  \end{itemize}
+  \item \textbf{Împărțirea setului în train/test}: folosim o proporție de \textbf{80\%} pentru antrenare și \textbf{20\%} pentru testare. Astfel, validăm corect performanța modelului pe date \emph{nevăzute} anterior.
+  \item \textbf{Crearea variabilei-țintă}: ne concentrăm pe \texttt{Revenue} ca indicator de profit, deși, la nevoie, putem examina și \texttt{Revenue / Visitors} ca indice de profitabilitate pe turist.
+\end{enumerate}
+
+\subsection{Argumente pentru metoda Random Forest}
+
+Ne-am orientat spre un model \textbf{Random Forest Regressor} din motivele:
+
+\begin{itemize}
+  \item \textbf{Robustețe} față de zgomotul din date: un singur arbore de decizie poate supraînvăța datele (overfitting), dar Random Forest, prin combinarea mai multor arbori, reduce varianța și îmbunătățește generalizarea.
+  \item \textbf{Capacitate de a surprinde relații non-liniare}: \texttt{Revenue} depinde nu doar de \texttt{Visitors}, ci și de \texttt{Country} (diferențe geografice, demografice), \texttt{Category} (unele activități pot fi mult mai profitabile) și \texttt{Year} (posibile trenduri în timp). Arborii de decizie nu cer relații strict liniare, fiind eficienți în astfel de situații.
+  \item \textbf{Implementare directă și rapidă}: librăria \texttt{scikit-learn} oferă o clasă \texttt{RandomForestRegressor} ușor de folosit, facilitând antrenarea și testarea pe un set standard de date.
+\end{itemize}
+
+\noindent
+După ce modelul este antrenat să \emph{prezică} \texttt{Revenue} pentru (Country, Year, Category, \dots), îl vom folosi pentru a \textbf{evalua potențialul} fiecărei categorii turistice în cadrul \emph{unei țări anume}, având astfel un mod direct de \textbf{maximizare} a veniturilor preconizate.
+
+\section{Pași concreți de implementare}
+
+\subsection{Fluxul rezolvării}
+
+\noindent
+Odată pregătite datele (curățate și codificate), fluxul de implementare este:
+\begin{enumerate}
+  \item \textbf{Definirea setului de antrenare}: \texttt{X} conține variabilele-predictor (de ex. \texttt{Year}, \texttt{Visitors}, plus \texttt{Country\_X} și \texttt{Category\_X}), iar \texttt{y} = \texttt{Revenue}.
+  \item \textbf{Antrenarea modelului RandomForestRegressor}: folosim un număr specific de arbori (ex. 100), stabilim \texttt{random\_state} pentru reproducibilitate.
+  \item \textbf{Testarea pe setul de test} (20\% date): calculăm \emph{RMSE} (Root Mean Squared Error) și \emph{MAE} (Mean Absolute Error). Cu cât sunt mai mici, cu atât modelul e mai bun.
+  \item \textbf{Generarea ierarhiei (ranking)}: creăm 6 instanțe de input, fiecare având \textbf{Category} diferită (Nature, Historical etc.), dar aceeași țară (\texttt{Country\_X}). Modelul prezice \texttt{Revenue} pe fiecare, noi sortăm descrescător și aflăm care categorie ocupă locul 1, 2, 3 etc.
+\end{enumerate}
+
+\subsection{Exemplu de interpretare a ierarhiei}
+
+Dacă, de pildă, la testare observăm că \textbf{Beach} conduce la cel mai mare \emph{Revenue} prezis, atunci un antreprenor care deschide un hotel în acea țară se poate \textbf{concentra} pe dezvoltarea activităților de plajă (sporturi acvatice, turism litoral etc.), știind că acestea vor aduce \textbf{venituri superioare} față de alte categorii (de ex. Cultural sau Historical).
+
+\section{Evaluare și concluzii}
+
+\subsection{Metrici de performanță}
+
+Pentru a \emph{valida} modelul, măsurăm:
+\begin{itemize}
+  \item \textbf{RMSE} (Root Mean Squared Error): cu cât mai mic, cu atât modelul a reprodus mai precis veniturile reale.
+  \item \textbf{MAE} (Mean Absolute Error): oferă o imagine clară asupra erorii medii în termeni monetari.  
+\end{itemize}
+
+\noindent
+Valori bune pentru aceste metrici indică un model \textbf{credibil}, care poate \textbf{ghida} deciziile investiționale.
+
+\subsection{Concluzie finală}
+
+Astfel, \textbf{Random Forest} se arată o metodă puternică pentru \textbf{maximizarea profitului turistic}, deoarece:
+\begin{enumerate}
+  \item Poate manipula relativ ușor date eterogene (Date despre țări, categorii, număr de vizitatori etc.).
+  \item Reduce supra-antrenarea și are \emph{o performanță} solidă, validată de RMSE și MAE rezonabile pe setul de test.
+  \item Permite \emph{rangarea} categoriilor turistice pentru \textbf{orice țară} interesată, generând un \emph{scor numeric} (venitul prezis) ce se poate ordona descrescător.
+
+\noindent
+\textbf{Codul complet Python}, care implementează toți pașii descriși (inclusiv antrenarea \emph{RandomForestRegressor} și generarea ranking-ului), se găsește într-un fișier separat, \texttt{cod\_random\_forest.py}. În acesta, fiecare linie importantă este comentată succint, pentru a clarifica funcționalitatea.
+
+\end{document}
